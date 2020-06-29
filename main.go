@@ -21,7 +21,7 @@ func main(){
     // CONNECT TO YOUR ATLAS CLUSTER:
     ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
     client, err := mongo.Connect(ctx, options.Client().ApplyURI(
-    "mongodb+srv://mongomoe:aegon@cluster0-xbkka.mongodb.net/gotutorials?retryWrites=true&w=majority",
+      "mongodb+srv://<username>:<password>@<cluster-name>/test?retryWrites=true&w=majority")
     ))
     if err != nil { log.Fatal(err) }
 
