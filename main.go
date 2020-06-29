@@ -3,42 +3,100 @@ package main
 import (
     "go.mongodb.org/mongo-driver/mongo"
     "go.mongodb.org/mongo-driver/mongo/options"
+    "go.mongodb.org/mongo-driver/bson"
+    "context"
+    "time"
+    "log"
+    "fmt"
 )
-func main(){
 
-    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-    defer cancel()
-    client, err := mongo.Connect(ctx, options.Client().ApplyURI(
-    "mongodb+srv://mongomoe:<password>@cluster0-xbkka.mongodb.net/<dbname>?retryWrites=true&w=majority",
-    ))
-    if err != nil { log.Fatal(err) }
-	// client, err := mongo.NewClient(options.Client().ApplyURI("mongodb://localhost:27017"))
-
-
-	//     fmt.Println("Connected to MongoDB!")
-
-    // // Rest of the code will go here
-    // collection := client.Database("test").Collection("stuff")
-
-    // rec := Trainer{"A", 10, "Town"}
-    // insertResult, err := collection.InsertOne(context.TODO(), rec)
-    // if err != nil {
-    //     log.Fatal(err)
-    // }else{
-    //     fmt.Println("something else occurred")
-    // }
-
-    // fmt.Println("Inserted a single document: ", insertResult.InsertedID)
+type Task struct {
+    Name string
+    Description  string
 }
 
+func main(){
 
 
+    // CONNECT TO YOUR ATLAS CLUSTER:
+    ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+    client, err := mongo.Connect(ctx, options.Client().ApplyURI(
+    "mongodb+srv://mongomoe:aegon@cluster0-xbkka.mongodb.net/gotutorials?retryWrites=true&w=majority",
+    ))
+    if err != nil { log.Fatal(err) }
 
-// import "go.mongodb.org/mongo-driver/mongo"
+    err = client.Ping(ctx, nil)
+    
+    if err != nil {
+        log.Fatal("There was a problem connecting to your Atlas cluster. Check that the URI includes a valid username and password, and that your IP address has been whitelisted. Error: ", err)
+    }
 
-// ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-// defer cancel()
-// client, err := mongo.Connect(ctx, options.Client().ApplyURI(
-//   "mongodb+srv://mongomoe:<password>@cluster0-xbkka.mongodb.net/<dbname>?retryWrites=true&w=majority",
-// ))
-// if err != nil { log.Fatal(err) }
+    fmt.Println("Connected to MongoDB!")
+
+    // INSERT TASK DOCUMENTS: 
+
+    collection := client.Database("tutorials").Collection("tasks")
+
+    groceriesTask := Task { "Buy Groceries", "Milk, Eggs, Bread"}
+    workoutTask := Task { "Workout", "Pullups, Pushups"}
+    homeworkTask := Task { "Homework", "Read chapter 13 - 15"}
+    meditationTask := Task { "Meditation", "Meditate 20 minutes"}
+
+    tasks := []interface{}{ groceriesTask, workoutTask, homeworkTask, meditationTask }
+    insertManyResult, err := collection.InsertMany(context.TODO(), tasks)
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Println("Inserted multiple documents: ", insertManyResult.InsertedIDs)
+
+    // READ DOCUMENTS: 
+
+    cursor, err := collection.Find(context.TODO(), bson.D{})    
+    for cursor.Next(ctx) {
+        // declare a result BSON object
+        var result bson.M
+        err := cursor.Decode(&result)
+        // If there is a cursor.Decode error
+        if err != nil {
+            log.Fatal("cursor.Next() error:", err)
+        } else {
+            fmt.Println("result:", result)
+        }
+    }
+
+    // UPDATE DOCUMENT: 
+    filter := bson.D{{"name", "Buy Groceries"}}
+    update := bson.D{
+        {"$set", bson.D{
+            {"description", "Milk, Eggs, Bread, Cheese"},
+        }},
+    }
+
+    updateResult, err := collection.UpdateOne(context.TODO(), filter, update)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Printf("Matched %v documents and updated %v documents.\n", updateResult.MatchedCount, updateResult.ModifiedCount)
+
+
+    // READ ONE DOCUMENT: 
+    // create a value into which the result can be decoded
+    var myTask Task
+
+    err = collection.FindOne(context.TODO(), filter).Decode(&myTask)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Printf("Found a single document: %+v\n", myTask)
+
+
+    // DELETE ALL DOCUMENTS: 
+    deleteResult, err := collection.DeleteMany(context.TODO(), bson.D{{}})
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Printf("Deleted %v documents in the tasks collection\n", deleteResult.DeletedCount)
+
+}
